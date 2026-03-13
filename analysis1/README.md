@@ -1,6 +1,6 @@
 ### Analysis 1 – simple dynamic surrogate (tutorial)
 
-This folder contains a first “warm‑up” problem for building surrogate models on synthetic process data.
+This folder contains a first "warm‑up" problem for building surrogate models on synthetic process data.
 
 #### 1. What data do we have?
 
@@ -18,66 +18,46 @@ The model should work on the **test** sheet, not just replay the training data.
 
 #### 3. How do we solve it?
 
+We use Random Forest and XGBoost as standard tree‑based ML baselines: they handle non‑linear relationships, need little feature scaling, and perform well with modest tuning. Using both lets us compare a simple ensemble (Random Forest) against a more flexible gradient‑boosted model (XGBoost), which is standard practice in surrogate‑modelling benchmarks.
+
 The notebook `experiment.ipynb` walks through three steps:
 
-1. **Data loading**  
-   - Read the Excel file and split into training and testing sets.  
-   - Separate inputs (U1, U2) and outputs (Y1, Y2).
+1. **Data loading** — read the Excel file and split into training and testing sets, separating inputs (U1, U2) from outputs (Y1, Y2).
 
-2. **Static models (no history)**  
-   - Train **Random Forest** and **XGBoost** using only the current inputs U1(t), U2(t) to predict Y1(t), Y2(t).  
-   - Evaluate on both train and test sets using MAE, RMSE, and R².
+2. **Static models (no history)** — train Random Forest and XGBoost using only the current inputs U1(t), U2(t) to predict Y1(t), Y2(t), then evaluate on both train and test.
 
-3. **Dynamic models (with history)**  
-   - Build new features that include short histories of the inputs and outputs (for example U1 and U2 at the current and previous step, and Y1 and Y2 from previous steps).  
-   - Train Random Forest and XGBoost on these lagged features.  
-   - Evaluate again on train and test, and compare to the static models.
+3. **Dynamic models (with history)** — build lagged features that include short histories of the inputs and past outputs, train both models again, and compare against the static results.
 
-#### 4. What is the accuracy?
+#### 4. What are the limitations?
 
-The notebook prints metric tables (MAE, RMSE, R2) for each model and each output.  
-For the **dynamic** models on the **test** data, the numbers look like this:
+- The data is synthetic and noise‑free; real plant data will be noisier and harder to model.
+- Only two inputs and two outputs are considered; real systems may involve many more tags and interactions.
+- The lag structure (how many past steps to include) is fixed by hand — a poor choice can hurt performance.
+- The models are "black boxes": they approximate the mapping well but offer no physical insight or extrapolation guarantees.
 
-Dynamic Random Forest (test):
+#### 5. Results
 
-| Output | MAE     | RMSE    | R2      |
-|--------|---------|---------|---------|
-| Y1     | 0.1371  | 0.3419  | 0.9935  |
-| Y2     | 0.2348  | 0.5542  | 0.9985  |
+On the **test** data, all four model configurations produce the following metrics:
 
-Dynamic XGBoost (test):
+| Model   | History | Output | MAE     | RMSE    | R2     |
+|---------|---------|--------|---------|---------|--------|
+| RF      | static  | Y1     | 2.0022  | 2.8493  | 0.5481 |
+| RF      | static  | Y2     | 6.6148  | 9.1092  | 0.5822 |
+| XGBoost | static  | Y1     | 2.2339  | 3.1198  | 0.4582 |
+| XGBoost | static  | Y2     | 7.0429  | 9.7550  | 0.5208 |
+| RF      | dynamic | Y1     | 0.1371  | 0.3419  | 0.9935 |
+| RF      | dynamic | Y2     | 0.2348  | 0.5542  | 0.9985 |
+| XGBoost | dynamic | Y1     | 0.1391  | 0.3924  | 0.9915 |
+| XGBoost | dynamic | Y2     | 0.2278  | 0.5070  | 0.9987 |
 
-| Output | MAE     | RMSE    | R2      |
-|--------|---------|---------|---------|
-| Y1     | 0.1391  | 0.3924  | 0.9915  |
-| Y2     | 0.2278  | 0.5070  | 0.9987  |
+The static models capture some of the behaviour but leave a lot of error (R2 around 0.5). Adding even a short history of past inputs and outputs cuts the error sharply — the dynamic models reach R2 above 0.99 for both outputs, meaning the surrogate tracks the test trajectories very closely.
 
-So the test R2 values are all around 0.99 or higher, and the errors are small, which means the dynamic surrogates match the test trajectories very well on this warm‑up case.
-
-#### 5. What are the limitations?
-
-- The data is synthetic and noise‑free, with clean inputs and perfect measurements. Real plant data will be noisier and harder to model.
-- Only two inputs and two outputs are considered here; real systems may involve many more tags and interactions.
-- The lag structure (how many past steps we include) is fixed by hand. A poor choice of lags can hurt performance, and the best choice may vary by process.
-- The models are “black boxes”: they approximate the mapping well, but they do not provide physical insight or guarantees outside the range of the training data.
-
-#### 6. Results and plots
-
-The notebook includes tables with the metric values and several plots of actual vs predicted outputs.  
-For quick reference, here is the **dynamic XGBoost test table** again:
-
-| Output | MAE     | RMSE    | R2      |
-|--------|---------|---------|---------|
-| Y1     | 0.1391  | 0.3924  | 0.9915  |
-| Y2     | 0.2278  | 0.5070  | 0.9987  |
-
-The two PNGs below capture example results from the same dynamic XGBoost model and are here to help you visualise what is going on.
-
-- The first figure shows **timestep‑wise error behaviour** (how the prediction error changes over time on the test set).
-- The second figure shows **Y1 and Y2 trajectories**: the true curves and the model’s predicted curves over time.
+The figures below show this visually for the dynamic XGBoost model:
 
 ![Timestep-wise XGBoost performance](./timestepwise_xgboost.png)
+How the prediction error changes over time on the test set — useful for spotting where the model struggles most.
 
 ![Dynamic XGBoost trajectories](./dynamic_xgboost.png)
+True vs predicted curves for Y1 and Y2 over time, showing how closely the dynamic surrogate follows the process.
 
-You can re‑run `experiment.ipynb` to regenerate the metrics and plots, or tweak the configuration (lags, model hyperparameters) and see how the results change.
+You can re‑run `experiment.ipynb` to regenerate the metrics and plots, or tweak the lag settings and model hyperparameters to see how the results change.
